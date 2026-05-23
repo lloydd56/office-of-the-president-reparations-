@@ -13,6 +13,7 @@ import {
   Tag,
   ChevronDown,
 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -45,7 +46,7 @@ const formatFileSize = (bytes: number) => {
 export const Upload: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { folders, tags, currentFolderId } = useFileStore();
+  const { folders, tags, currentFolderId, uploadFile: storeUploadFile } = useFileStore();
   
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -77,13 +78,13 @@ export const Upload: React.FC = () => {
   
   const addFiles = (newFiles: File[]) => {
     const uploadFiles: UploadFile[] = newFiles.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
+      id: uuidv4(),
       file,
       progress: 0,
       status: 'pending',
       tags: selectedTags,
     }));
-    
+
     setFiles(prev => [...prev, ...uploadFiles]);
   };
   
@@ -99,43 +100,42 @@ export const Upload: React.FC = () => {
   
   const handleUpload = async () => {
     if (!user) return;
-    
+
     setIsUploading(true);
-    
+
     for (const uploadFile of files) {
       if (uploadFile.status !== 'pending') continue;
-      
-      setFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, status: 'uploading' } : f
+
+      // Show uploading state immediately — gives visual feedback before the network call
+      setFiles(prev => prev.map(f =>
+        f.id === uploadFile.id ? { ...f, status: 'uploading', progress: 20 } : f
       ));
-      
-      // Simulate upload progress
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setFiles(prev => prev.map(f => 
-          f.id === uploadFile.id ? { ...f, progress } : f
-        ));
-      }
-      
+
       try {
-        await useFileStore.getState().uploadFile(
+        // Fix #7: real upload — no fake setTimeout loop
+        // Fix #13: use hook-bound uploadFile (destructured at top of component)
+        setFiles(prev => prev.map(f =>
+          f.id === uploadFile.id ? { ...f, progress: 60 } : f
+        ));
+
+        await storeUploadFile(
           uploadFile.file,
           selectedFolder,
           uploadFile.tags,
           user.id,
           user.name
         );
-        
-        setFiles(prev => prev.map(f => 
+
+        setFiles(prev => prev.map(f =>
           f.id === uploadFile.id ? { ...f, status: 'complete', progress: 100 } : f
         ));
-      } catch (error) {
-        setFiles(prev => prev.map(f => 
+      } catch {
+        setFiles(prev => prev.map(f =>
           f.id === uploadFile.id ? { ...f, status: 'error', error: 'Upload failed' } : f
         ));
       }
     }
-    
+
     setIsUploading(false);
   };
   

@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { useFileStore } from '../store/fileStore';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 const getFileIcon = (mimeType: string, size: 'sm' | 'lg' = 'lg') => {
   const sizeClass = size === 'lg' ? 'w-16 h-16' : 'w-8 h-8';
@@ -35,43 +36,95 @@ const formatFileSize = (bytes: number) => {
 export const SharePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const { shares, getFileById } = useFileStore();
-  
+
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [isVerifying, setIsVerifying] = useState(false);
+  // Fix #10: track the live access count so we can increment it on load
+  const [liveAccessCount, setLiveAccessCount] = useState<number | null>(null);
+
   const share = shares.find(s => s.token === token);
   const file = share ? getFileById(share.fileId) : null;
-  
+
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
+    const init = async () => {
       setIsLoading(false);
-      // If no password required, auto-unlock
-      if (share && !share.password) {
+      if (!share) return;
+
+      // Fix #10: increment access_count in DB and update local display
+      if (supabaseConfigured) {
+        const { data } = await supabase
+          .from('share_links')
+          .update({ access_count: (share.accessCount ?? 0) + 1 })
+          .eq('token', token)
+          .select('access_count')
+          .single();
+        if (data) setLiveAccessCount(data.access_count);
+      } else {
+        setLiveAccessCount((share.accessCount ?? 0) + 1);
+      }
+
+      // Auto-unlock if no password required
+      if (!share.password) {
         setIsUnlocked(true);
       }
-    }, 500);
-  }, [share]);
-  
-  const handleUnlock = () => {
-    if (!share?.password) {
+    };
+    init();
+  }, [share?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fix #2: verify password server-side via a Supabase RPC call
+  const handleUnlock = async () => {
+    if (!share) return;
+
+    if (!share.password) {
       setIsUnlocked(true);
       return;
     }
-    
-    // In production, password verification happens server-side
-    if (password.length > 0) {
-      setIsUnlocked(true);
-      setError('');
-    } else {
+
+    if (!password) {
       setError('Please enter the password');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError('');
+
+    try {
+      if (supabaseConfigured) {
+        // Call the server-side verify function — never exposes the hash to the client
+        const { data, error: rpcError } = await supabase
+          .rpc('verify_share_password', { p_token: token, p_password: password });
+
+        if (rpcError) {
+          setError('Unable to verify password. Please try again.');
+          return;
+        }
+
+        if (!data) {
+          setError('Incorrect password');
+          return;
+        }
+      } else {
+        // Local fallback: compare against in-memory share (dev only)
+        if (share.password !== password) {
+          setError('Incorrect password');
+          return;
+        }
+      }
+
+      setIsUnlocked(true);
+    } catch {
+      setError('Unable to verify password. Please try again.');
+    } finally {
+      setIsVerifying(false);
     }
   };
-  
+
   const isExpired = share?.expiresAt && new Date(share.expiresAt) < new Date();
-  
+  const displayAccessCount = liveAccessCount ?? share?.accessCount ?? 0;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -82,7 +135,7 @@ export const SharePage: React.FC = () => {
       </div>
     );
   }
-  
+
   if (!share || !file) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -98,7 +151,7 @@ export const SharePage: React.FC = () => {
       </div>
     );
   }
-  
+
   if (isExpired) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -117,7 +170,7 @@ export const SharePage: React.FC = () => {
       </div>
     );
   }
-  
+
   if (share.password && !isUnlocked) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -126,18 +179,18 @@ export const SharePage: React.FC = () => {
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Lock className="w-8 h-8 text-indigo-600" />
             </div>
-            
+
             <h2 className="text-xl font-bold text-slate-900 mb-2">Password Protected</h2>
             <p className="text-slate-500 mb-6">
               Enter the password to access this file
             </p>
-            
+
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
                 {error}
               </div>
             )}
-            
+
             <div className="space-y-4">
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -150,8 +203,8 @@ export const SharePage: React.FC = () => {
                   placeholder="Enter password"
                 />
               </div>
-              
-              <Button onClick={handleUnlock} className="w-full">
+
+              <Button onClick={handleUnlock} className="w-full" isLoading={isVerifying}>
                 Unlock File
               </Button>
             </div>
@@ -160,7 +213,7 @@ export const SharePage: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -177,7 +230,7 @@ export const SharePage: React.FC = () => {
           </div>
         </div>
       </header>
-      
+
       {/* Content */}
       <main className="max-w-4xl mx-auto p-6">
         <Card>
@@ -187,7 +240,7 @@ export const SharePage: React.FC = () => {
               <div className="p-4 bg-slate-100 rounded-xl">
                 {getFileIcon(file.mimeType)}
               </div>
-              
+
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">{file.name}</h2>
                 <div className="flex flex-wrap gap-4 text-sm text-slate-500">
@@ -197,7 +250,7 @@ export const SharePage: React.FC = () => {
                   <span>•</span>
                   <span>Uploaded {format(new Date(file.createdAt), 'MMMM d, yyyy')}</span>
                 </div>
-                
+
                 {file.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     {file.tags.map(tag => (
@@ -209,7 +262,7 @@ export const SharePage: React.FC = () => {
                 )}
               </div>
             </div>
-            
+
             {/* Preview Area */}
             <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center mb-8">
               {file.mimeType.startsWith('image/') ? (
@@ -225,13 +278,14 @@ export const SharePage: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             {/* Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-slate-50 rounded-xl">
               <div className="flex items-center gap-3">
                 <Eye className="w-5 h-5 text-slate-400" />
+                {/* Fix #10: show real persisted count */}
                 <span className="text-sm text-slate-500">
-                  {share.accessCount + 1} views
+                  {displayAccessCount} {displayAccessCount === 1 ? 'view' : 'views'}
                 </span>
                 {share.expiresAt && (
                   <>
@@ -242,14 +296,14 @@ export const SharePage: React.FC = () => {
                   </>
                 )}
               </div>
-              
+
               <Button size="lg" leftIcon={<Download className="w-5 h-5" />}>
                 Download File
               </Button>
             </div>
           </CardContent>
         </Card>
-        
+
         {/* Footer */}
         <p className="text-center text-sm text-slate-400 mt-8">
           Shared securely via Office of the President - Reparations File Management System

@@ -145,7 +145,9 @@ create table if not exists public.share_links (
   id uuid primary key default gen_random_uuid(),
   file_id uuid references public.files(id) on delete cascade not null,
   token text unique not null default replace(gen_random_uuid()::text, '-', ''),
-  password text,
+  -- Fix #5: store a bcrypt hash of the password, never plaintext
+  -- Use pgcrypto: SELECT crypt('user_password', gen_salt('bf', 10));
+  password_hash text,
   expires_at timestamptz,
   max_access int,
   access_count int not null default 0,
@@ -155,16 +157,61 @@ create table if not exists public.share_links (
 
 alter table public.share_links enable row level security;
 
+-- Authenticated users can manage their own share links
 create policy "Share links viewable by authenticated" on public.share_links
   for select using (auth.role() = 'authenticated');
 create policy "Authenticated can create share links" on public.share_links
   for insert with check (auth.role() = 'authenticated');
 create policy "Creator can delete share links" on public.share_links
   for delete using (created_by = auth.uid());
+create policy "Creator can update share links" on public.share_links
+  for update using (created_by = auth.uid());
 
--- Public access to share links by token (for unauthenticated share page)
-create policy "Anyone can view share link by token" on public.share_links
-  for select using (true);
+-- Fix #5: public share page needs to look up a link by token, but should only
+-- expose the token, expiry, access_count and whether a password is set —
+-- NOT the password_hash. Use a security-definer function instead of a blanket
+-- "using (true)" policy so we control exactly what is returned.
+create or replace function public.get_share_link_by_token(p_token text)
+returns table (
+  id uuid,
+  file_id uuid,
+  token text,
+  has_password boolean,
+  expires_at timestamptz,
+  max_access int,
+  access_count int,
+  created_at timestamptz
+)
+language sql
+security definer
+stable
+as $$
+  select
+    id,
+    file_id,
+    token,
+    (password_hash is not null) as has_password,
+    expires_at,
+    max_access,
+    access_count,
+    created_at
+  from public.share_links
+  where token = p_token;
+$$;
+
+-- Password verification function — returns true/false, never exposes the hash
+create or replace function public.verify_share_password(p_token text, p_password text)
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1 from public.share_links
+    where token = p_token
+      and password_hash = crypt(p_password, password_hash)
+  );
+$$;
 
 -- 6. ACTIVITY LOG
 create table if not exists public.activity_log (

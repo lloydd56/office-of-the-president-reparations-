@@ -70,7 +70,8 @@ const mapTag = (t: any): Tag => ({
   id: t.id,
   name: t.name,
   color: t.color,
-  fileCount: 0,
+  // Use DB-provided count when available, fall back to 0
+  fileCount: typeof t.file_count === 'number' ? t.file_count : 0,
 });
 
 // ─── state ──────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ interface FileState {
   dataLoaded: boolean;
 
   loadData: () => Promise<void>;
+  resetData: () => void;
   setCurrentFolder: (folderId: string | null) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setSortBy: (s: 'name' | 'date' | 'size' | 'type') => void;
@@ -174,6 +176,19 @@ export const useFileStore = create<FileState>()((set, get) => ({
       console.error('Failed to load data:', e);
       set({ dataLoaded: true });
     }
+  },
+
+  // Fix #4: called by authStore.logout() so the next user gets a clean slate
+  resetData: () => {
+    set({
+      files: [],
+      folders: [],
+      activities: [],
+      shares: [],
+      currentFolderId: null,
+      selectedFiles: [],
+      dataLoaded: false,
+    });
   },
 
   setCurrentFolder: (id) => set({ currentFolderId: id, selectedFiles: [] }),
@@ -337,13 +352,24 @@ export const useFileStore = create<FileState>()((set, get) => ({
   },
 
   deleteFolder: async (id) => {
+    // Fix #8: collect all descendant folder IDs recursively before removing
+    const allFolders = get().folders;
+    const collectDescendants = (parentId: string): string[] => {
+      const children = allFolders.filter((f) => f.parentId === parentId).map((f) => f.id);
+      return children.reduce<string[]>((acc, childId) => [...acc, childId, ...collectDescendants(childId)], []);
+    };
+    const descendantIds = collectDescendants(id);
+    const removedIds = new Set([id, ...descendantIds]);
+
     set((s) => ({
-      folders: s.folders.filter((f) => f.id !== id && f.parentId !== id),
-      files: s.files.map((f) => f.folderId === id ? { ...f, deletedAt: new Date() } : f),
+      folders: s.folders.filter((f) => !removedIds.has(f.id)),
+      files: s.files.map((f) =>
+        f.folderId && removedIds.has(f.folderId) ? { ...f, deletedAt: new Date() } : f
+      ),
     }));
     if (supabaseConfigured) {
       await supabase.from('files').update({ deleted_at: new Date().toISOString() }).eq('folder_id', id);
-      await supabase.from('folders').delete().eq('id', id);
+      await supabase.from('folders').delete().eq('id', id); // CASCADE handles children in DB
     }
   },
 

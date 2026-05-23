@@ -10,8 +10,9 @@ interface AuthState {
   initialized: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; requiresApproval?: boolean }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string; isFirstUser?: boolean; needsConfirmation?: boolean }>;
-  logout: () => void;
-  updateUser: (updates: Partial<User>) => void;
+  logout: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   approveUser: (userId: string) => void;
   rejectUser: (userId: string) => void;
   updateUserRole: (userId: string, role: UserRole) => void;
@@ -176,7 +177,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         password,
         options: {
           data: { name },
-          // This makes it work whether email confirmation is on or off
           emailRedirectTo: window.location.origin,
         },
       });
@@ -191,7 +191,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return { success: false, error: 'Registration failed' };
       }
 
-      // Check if email confirmation is required
       // If session is null, email confirmation is needed
       const needsConfirmation = !data.session;
 
@@ -220,11 +219,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
   },
 
+  // Fix #3: properly typed as Promise<void>
   logout: async () => {
     if (supabaseConfigured) {
       await supabase.auth.signOut();
     }
     set({ user: null, isAuthenticated: false });
+    // Fix #4: reset dataLoaded so the next user gets fresh data
+    // We import lazily to avoid circular deps — reset via the fileStore directly
+    const { useFileStore } = await import('./fileStore');
+    useFileStore.getState().resetData();
   },
 
   updateUser: async (updates) => {
@@ -243,6 +247,41 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       user: updated,
       users: get().users.map((u) => (u.id === cur.id ? updated : u)),
     });
+  },
+
+  // Fix #9: actually calls Supabase to change the password
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    if (!supabaseConfigured) {
+      return { success: false, error: 'Supabase is not configured.' };
+    }
+
+    const user = get().user;
+    if (!user) return { success: false, error: 'Not authenticated.' };
+
+    try {
+      // Re-authenticate to verify current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        return { success: false, error: 'Current password is incorrect.' };
+      }
+
+      // Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        return { success: false, error: updateError.message };
+      }
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Password change failed.' };
+    }
   },
 
   approveUser: async (userId) => {

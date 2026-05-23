@@ -21,6 +21,7 @@ import { cn } from '../utils/cn';
 export const Settings: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
+  const changePassword = useAuthStore((s) => s.changePassword);
   const viewMode = useFileStore((s) => s.viewMode);
   const setViewMode = useFileStore((s) => s.setViewMode);
 
@@ -37,6 +38,7 @@ export const Settings: React.FC = () => {
   const [showPasswords, setShowPasswords] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   // Notification settings
   const [notifications, setNotifications] = useState({
@@ -85,7 +87,7 @@ export const Settings: React.FC = () => {
     setTimeout(() => setProfileSaved(false), 3000);
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     setPasswordError('');
     setPasswordSuccess(false);
 
@@ -102,12 +104,20 @@ export const Settings: React.FC = () => {
       return;
     }
 
-    // Simulate password update
-    setPasswordSuccess(true);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setPasswordSuccess(false), 3000);
+    setPasswordLoading(true);
+    // Fix #9: actually call Supabase to change the password
+    const result = await changePassword(currentPassword, newPassword);
+    setPasswordLoading(false);
+
+    if (result.success) {
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } else {
+      setPasswordError(result.error || 'Password change failed');
+    }
   };
 
   const handleSaveNotifications = () => {
@@ -321,6 +331,7 @@ export const Settings: React.FC = () => {
                 <Button
                   onClick={handleSavePassword}
                   disabled={!currentPassword || !newPassword || !confirmPassword}
+                  isLoading={passwordLoading}
                 >
                   Update Password
                 </Button>
