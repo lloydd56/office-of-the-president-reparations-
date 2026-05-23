@@ -277,7 +277,7 @@ export const Upload: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          'border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all',
+          'border-2 border-dashed rounded-2xl p-8 md:p-12 text-center cursor-pointer transition-all',
           isDragging
             ? 'border-indigo-500 bg-indigo-50'
             : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/50'
@@ -337,27 +337,27 @@ export const Upload: React.FC = () => {
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100">
               {files.map(file => (
-                <div key={file.id} className="px-6 py-4 flex items-center gap-4">
-                  {getFileIcon(file.file.type)}
+                <div key={file.id} className="px-4 md:px-6 py-4 flex items-start gap-3">
+                  <div className="shrink-0 mt-0.5">{getFileIcon(file.file.type)}</div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900 truncate">
+                      <p className="font-medium text-slate-900 truncate text-sm md:text-base">
                         {file.file.name}
                       </p>
                       {file.status === 'complete' && (
-                        <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        <Check className="w-4 h-4 text-green-500 shrink-0" />
                       )}
                       {file.status === 'error' && (
-                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-sm text-slate-400">
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="text-xs text-slate-400">
                         {formatFileSize(file.file.size)}
                       </span>
                       {file.tags.length > 0 && (
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {file.tags.map(tag => (
                             <span key={tag} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
                               {tag}
@@ -377,16 +377,16 @@ export const Upload: React.FC = () => {
                     )}
                     
                     {file.error && (
-                      <p className="text-sm text-red-500 mt-1">{file.error}</p>
+                      <p className="text-xs text-red-500 mt-1">{file.error}</p>
                     )}
                   </div>
                   
                   {file.status === 'pending' && (
                     <button
                       onClick={() => removeFile(file.id)}
-                      className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>

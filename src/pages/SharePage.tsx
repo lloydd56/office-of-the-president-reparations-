@@ -217,42 +217,42 @@ export const SharePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Shared File</p>
-              <h1 className="text-sm font-semibold text-slate-900">Office of the President - Reparations</h1>
+              <p className="text-xs text-slate-500 uppercase tracking-wider hidden sm:block">Shared File</p>
+              <h1 className="text-xs md:text-sm font-semibold text-slate-900">Office of the President - Reparations</h1>
             </div>
           </div>
         </div>
       </header>
 
       {/* Content */}
-      <main className="max-w-4xl mx-auto p-6">
+      <main className="max-w-4xl mx-auto p-4 md:p-6">
         <Card>
-          <CardContent className="p-8">
+          <CardContent className="p-4 md:p-8">
             {/* File Info */}
-            <div className="flex items-start gap-6 mb-8">
-              <div className="p-4 bg-slate-100 rounded-xl">
+            <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6 mb-6 md:mb-8">
+              <div className="p-3 md:p-4 bg-slate-100 rounded-xl self-start">
                 {getFileIcon(file.mimeType)}
               </div>
 
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">{file.name}</h2>
-                <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-2 break-words">{file.name}</h2>
+                <div className="flex flex-wrap gap-2 md:gap-4 text-sm text-slate-500">
                   <span>{formatFileSize(file.size)}</span>
-                  <span>•</span>
-                  <span>{file.mimeType}</span>
-                  <span>•</span>
-                  <span>Uploaded {format(new Date(file.createdAt), 'MMMM d, yyyy')}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="hidden sm:inline">{file.mimeType}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span>Uploaded {format(new Date(file.createdAt), 'MMM d, yyyy')}</span>
                 </div>
 
                 {file.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-4">
+                  <div className="flex flex-wrap gap-2 mt-3">
                     {file.tags.map(tag => (
                       <span key={tag} className="px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded-full">
                         {tag}
@@ -264,32 +264,31 @@ export const SharePage: React.FC = () => {
             </div>
 
             {/* Preview Area */}
-            <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center mb-8">
+            <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center mb-6 md:mb-8">
               {file.mimeType.startsWith('image/') ? (
                 <div className="text-center">
-                  <FileImage className="w-24 h-24 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">Image Preview</p>
+                  <FileImage className="w-16 h-16 md:w-24 md:h-24 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm">Image Preview</p>
                 </div>
               ) : (
                 <div className="text-center">
                   {getFileIcon(file.mimeType)}
-                  <p className="text-slate-500 mt-4">Preview not available</p>
-                  <p className="text-sm text-slate-400">Download the file to view its contents</p>
+                  <p className="text-slate-500 mt-3 text-sm">Preview not available</p>
+                  <p className="text-xs text-slate-400">Download the file to view its contents</p>
                 </div>
               )}
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-slate-50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Eye className="w-5 h-5 text-slate-400" />
-                {/* Fix #10: show real persisted count */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-6 bg-slate-50 rounded-xl">
+              <div className="flex flex-wrap items-center gap-3">
+                <Eye className="w-5 h-5 text-slate-400 shrink-0" />
                 <span className="text-sm text-slate-500">
                   {displayAccessCount} {displayAccessCount === 1 ? 'view' : 'views'}
                 </span>
                 {share.expiresAt && (
                   <>
-                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-300 hidden sm:inline">•</span>
                     <span className="text-sm text-slate-500">
                       Expires {format(new Date(share.expiresAt), 'MMM d, yyyy')}
                     </span>
@@ -297,7 +296,7 @@ export const SharePage: React.FC = () => {
                 )}
               </div>
 
-              <Button size="lg" leftIcon={<Download className="w-5 h-5" />}>
+              <Button size="lg" leftIcon={<Download className="w-5 h-5" />} className="w-full sm:w-auto">
                 Download File
               </Button>
             </div>
@@ -305,7 +304,7 @@ export const SharePage: React.FC = () => {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-400 mt-8">
+        <p className="text-center text-xs md:text-sm text-slate-400 mt-6 md:mt-8 px-4">
           Shared securely via Office of the President - Reparations File Management System
         </p>
       </main>

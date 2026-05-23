@@ -162,7 +162,7 @@ export const Admin: React.FC = () => {
       </div>
       
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardContent className="flex items-center gap-4">
             <div className="p-3 bg-indigo-100 rounded-xl">
@@ -209,14 +209,14 @@ export const Admin: React.FC = () => {
         </Card>
       </div>
       
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      {/* Tabs — scrollable on mobile */}
+      <div className="flex gap-0 border-b border-slate-200 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={cn(
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2',
+              'px-3 md:px-4 py-3 text-xs md:text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0',
               activeTab === tab.id
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -225,7 +225,7 @@ export const Admin: React.FC = () => {
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
               <span className={cn(
-                'px-2 py-0.5 text-xs font-semibold rounded-full',
+                'px-1.5 py-0.5 text-xs font-semibold rounded-full',
                 activeTab === tab.id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
               )}>
                 {tab.count}
@@ -248,26 +248,26 @@ export const Admin: React.FC = () => {
             ) : (
               <div className="divide-y divide-slate-100">
                 {pendingUsers.map(user => (
-                  <div key={user.id} className="px-6 py-4 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
-                      {user.name.charAt(0).toUpperCase()}
+                  <div key={user.id} className="px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold shrink-0">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{user.name}</p>
+                        <p className="text-sm text-slate-500 truncate">{user.email}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Registered {format(new Date(user.createdAt), 'MMM d, yyyy')}
+                        </p>
+                      </div>
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900">{user.name}</p>
-                      <p className="text-sm text-slate-500">{user.email}</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Registered {format(new Date(user.createdAt), 'MMM d, yyyy h:mm a')}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 sm:shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleReject(user.id)}
                         leftIcon={<XCircle className="w-4 h-4" />}
-                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        className="text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-none"
                       >
                         Reject
                       </Button>
@@ -275,6 +275,7 @@ export const Admin: React.FC = () => {
                         size="sm"
                         onClick={() => handleApprove(user.id)}
                         leftIcon={<CheckCircle className="w-4 h-4" />}
+                        className="flex-1 sm:flex-none"
                       >
                         Approve
                       </Button>
@@ -290,55 +291,55 @@ export const Admin: React.FC = () => {
       {/* All Users */}
       {activeTab === 'users' && (
         <Card>
-          <CardContent className="p-0">
-            <table className="w-full">
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Last Login</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                  <th className="text-left px-4 md:px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
+                  <th className="text-left px-4 md:px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
+                  <th className="text-left px-4 md:px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 md:px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Last Login</th>
+                  <th className="text-left px-4 md:px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {allUsers.map(user => (
                   <tr key={user.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
+                    <td className="px-4 md:px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={cn(
-                          'w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm',
+                          'w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0',
                           user.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gradient-to-br from-slate-400 to-slate-500'
                         )}>
                           {user.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{user.name}</p>
-                          <p className="text-sm text-slate-500">{user.email}</p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 truncate">{user.name}</p>
+                          <p className="text-xs text-slate-500 truncate hidden sm:block">{user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 md:px-6 py-4">
                       <Badge variant={getRoleBadgeVariant(user.role)}>
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 md:px-6 py-4">
                       {getStatusBadge(user)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">
+                    <td className="px-4 md:px-6 py-4 text-sm text-slate-500 hidden md:table-cell">
                       {user.lastLoginAt
                         ? format(new Date(user.lastLoginAt), 'MMM d, yyyy')
                         : 'Never'}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 md:px-6 py-4">
                       {user.id !== currentUser?.id && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleChangeRole(user)}
                         >
-                          Change Role
+                          <span className="hidden sm:inline">Change </span>Role
                         </Button>
                       )}
                     </td>

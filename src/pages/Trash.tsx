@@ -71,7 +71,7 @@ export const Trash: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
             <Trash2 className="w-7 h-7 text-slate-400" />
@@ -82,14 +82,14 @@ export const Trash: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {selectedFiles.length > 0 && (
             <Button
               variant="outline"
               onClick={handleRestoreSelected}
               leftIcon={<RotateCcw className="w-4 h-4" />}
             >
-              Restore Selected ({selectedFiles.length})
+              Restore ({selectedFiles.length})
             </Button>
           )}
           {trashedFiles.length > 0 && (
@@ -149,23 +149,24 @@ export const Trash: React.FC = () => {
                   
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900 truncate">{file.name}</p>
-                    <div className="flex items-center gap-3 text-sm text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 mt-0.5">
                       <span>{formatFileSize(file.size)}</span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Deleted {file.deletedAt ? format(new Date(file.deletedAt), 'MMM d, yyyy') : 'Unknown'}
+                        <span className="hidden sm:inline">Deleted </span>
+                        {file.deletedAt ? format(new Date(file.deletedAt), 'MMM d, yyyy') : 'Unknown'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleRestore(file.id)}
                       leftIcon={<RotateCcw className="w-4 h-4" />}
                     >
-                      Restore
+                      <span className="hidden sm:inline">Restore</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -174,7 +175,7 @@ export const Trash: React.FC = () => {
                       className="text-red-600 hover:bg-red-50"
                       leftIcon={<X className="w-4 h-4" />}
                     >
-                      Delete
+                      <span className="hidden sm:inline">Delete</span>
                     </Button>
                   </div>
                 </div>

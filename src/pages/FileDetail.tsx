@@ -429,47 +429,52 @@ export const FileDetail: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-lg">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-lg shrink-0">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div className="min-w-0">
             {isEditing ? (
               <div className="flex items-center gap-2">
                 <input value={editName} onChange={(e) => setEditName(e.target.value)}
-                  className="text-xl font-bold text-slate-900 border-b-2 border-indigo-500 focus:outline-none bg-transparent" autoFocus
+                  className="text-lg md:text-xl font-bold text-slate-900 border-b-2 border-indigo-500 focus:outline-none bg-transparent min-w-0" autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') { renameFile(file.id, editName); setIsEditing(false); } if (e.key === 'Escape') { setEditName(file.name); setIsEditing(false); } }} />
-                <button onClick={() => { renameFile(file.id, editName); setIsEditing(false); }} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-5 h-5" /></button>
-                <button onClick={() => { setEditName(file.name); setIsEditing(false); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+                <button onClick={() => { renameFile(file.id, editName); setIsEditing(false); }} className="p-1 text-green-600 hover:bg-green-50 rounded shrink-0"><Check className="w-5 h-5" /></button>
+                <button onClick={() => { setEditName(file.name); setIsEditing(false); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded shrink-0"><X className="w-5 h-5" /></button>
               </div>
             ) : (
-              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                {file.name}
-                {file.starred && <Star className="w-5 h-5 text-amber-500" fill="currentColor" />}
+              <h1 className="text-lg md:text-2xl font-bold text-slate-900 flex items-center gap-2 truncate">
+                <span className="truncate">{file.name}</span>
+                {file.starred && <Star className="w-5 h-5 text-amber-500 shrink-0" fill="currentColor" />}
               </h1>
             )}
             <p className="text-sm text-slate-500">{formatFileSize(file.size)} · {file.mimeType}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap shrink-0">
           {canEdit && (
-            <div className="flex border border-slate-200 rounded-lg overflow-hidden mr-2">
-              <button onClick={() => setViewMode('preview')} className={cn('px-3 py-1.5 text-sm flex items-center gap-1.5', viewMode === 'preview' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50')}>
-                <Eye className="w-4 h-4" /> View
+            <div className="flex border border-slate-200 rounded-lg overflow-hidden mr-1">
+              <button onClick={() => setViewMode('preview')} className={cn('px-2.5 py-1.5 text-sm flex items-center gap-1.5', viewMode === 'preview' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50')}>
+                <Eye className="w-4 h-4" /> <span className="hidden sm:inline">View</span>
               </button>
-              <button onClick={() => setViewMode('edit')} className={cn('px-3 py-1.5 text-sm flex items-center gap-1.5', viewMode === 'edit' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50')}>
-                <Edit2 className="w-4 h-4" /> Edit
+              <button onClick={() => setViewMode('edit')} className={cn('px-2.5 py-1.5 text-sm flex items-center gap-1.5', viewMode === 'edit' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50')}>
+                <Edit2 className="w-4 h-4" /> <span className="hidden sm:inline">Edit</span>
               </button>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={handleToggleStar} leftIcon={<Star className="w-4 h-4" fill={file.starred ? 'currentColor' : 'none'} />}
+          <Button variant="outline" size="sm" onClick={handleToggleStar}
+            leftIcon={<Star className="w-4 h-4" fill={file.starred ? 'currentColor' : 'none'} />}
             className={file.starred ? 'text-amber-600 border-amber-200 bg-amber-50' : ''}>
-            {file.starred ? 'Starred' : 'Star'}
+            <span className="hidden sm:inline">{file.starred ? 'Starred' : 'Star'}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownload} leftIcon={<Download className="w-4 h-4" />}>Download</Button>
-          <Button size="sm" onClick={() => setShowShareModal(true)} leftIcon={<Share2 className="w-4 h-4" />}>Share</Button>
+          <Button variant="outline" size="sm" onClick={handleDownload} leftIcon={<Download className="w-4 h-4" />}>
+            <span className="hidden sm:inline">Download</span>
+          </Button>
+          <Button size="sm" onClick={() => setShowShareModal(true)} leftIcon={<Share2 className="w-4 h-4" />}>
+            <span className="hidden sm:inline">Share</span>
+          </Button>
           <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-slate-100 rounded-lg"><Edit2 className="w-4 h-4 text-slate-400" /></button>
           <button onClick={handleDelete} className="p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4 text-red-400" /></button>
         </div>

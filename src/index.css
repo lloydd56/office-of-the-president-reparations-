@@ -32,6 +32,18 @@
   color: #64748b;
 }
 
+/* Sidebar — keep white background in dark mode so it contrasts with the page */
+.dark aside {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* Header */
+.dark header {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

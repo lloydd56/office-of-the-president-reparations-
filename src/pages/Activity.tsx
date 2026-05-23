@@ -148,7 +148,7 @@ export const Activity: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
             <ActivityIcon className="w-7 h-7 text-indigo-600" />
@@ -167,9 +167,9 @@ export const Activity: React.FC = () => {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -183,13 +183,13 @@ export const Activity: React.FC = () => {
             </div>
             
             {/* Date Filter */}
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg self-start sm:self-auto">
               {(['all', 'today', 'week', 'month'] as const).map(option => (
                 <button
                   key={option}
                   onClick={() => setDateFilter(option)}
                   className={cn(
-                    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                    'px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors',
                     dateFilter === option
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
@@ -264,24 +264,24 @@ export const Activity: React.FC = () => {
                 <CardContent className="p-0">
                   <div className="divide-y divide-slate-100">
                     {group.activities.map(activity => (
-                      <div key={activity.id} className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                        <div className="p-2 bg-slate-100 rounded-lg">
+                      <div key={activity.id} className="px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 md:gap-4 hover:bg-slate-50 transition-colors">
+                        <div className="p-1.5 md:p-2 bg-slate-100 rounded-lg shrink-0">
                           {getActivityIcon(activity.action)}
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <p className="text-slate-900">
+                          <p className="text-slate-900 text-sm md:text-base">
                             <span className="font-medium">{activity.userName}</span>
                             {' '}
                             <span className="text-slate-600">{getActionDescription(activity)}</span>
                           </p>
-                          <p className="text-sm text-slate-400 mt-0.5">
+                          <p className="text-xs text-slate-400 mt-0.5">
                             {format(new Date(activity.createdAt), 'h:mm a')}
                           </p>
                         </div>
                         
                         <span className={cn(
-                          'px-2 py-1 text-xs font-medium rounded-full',
+                          'hidden sm:inline-flex px-2 py-1 text-xs font-medium rounded-full shrink-0',
                           activity.resourceType === 'file' && 'bg-blue-100 text-blue-700',
                           activity.resourceType === 'folder' && 'bg-purple-100 text-purple-700',
                           activity.resourceType === 'user' && 'bg-green-100 text-green-700',

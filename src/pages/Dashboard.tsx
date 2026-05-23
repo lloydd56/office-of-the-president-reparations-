@@ -208,7 +208,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Stats Cards (show only on root) */}
       {!currentFolderId && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card>
             <CardContent className="flex items-center gap-4">
               <div className="p-3 bg-indigo-100 rounded-xl">
@@ -337,7 +337,7 @@ export const Dashboard: React.FC = () => {
       {subfolders.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-slate-500 mb-3">Folders</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {subfolders.map((folder) => (
               <div
                 key={folder.id}
@@ -373,7 +373,7 @@ export const Dashboard: React.FC = () => {
             <Button onClick={() => navigate('/upload')}>Upload Files</Button>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
             {files.map((file) => (
               <div
                 key={file.id}
@@ -427,8 +427,8 @@ export const Dashboard: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <table className="w-full min-w-[500px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="w-8 px-4 py-3">

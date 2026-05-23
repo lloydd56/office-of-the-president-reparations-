@@ -22,7 +22,11 @@ import { useFileStore } from '../../store/fileStore';
 import { useAuthStore } from '../../store/authStore';
 import { Folder as FolderType } from '../../types';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
@@ -66,6 +70,12 @@ export const Sidebar: React.FC = () => {
     });
   };
 
+  const handleNav = (path: string, extraAction?: () => void) => {
+    extraAction?.();
+    navigate(path);
+    onClose?.();
+  };
+
   const handleCreateFolder = async () => {
     const trimmed = newFolderName.trim();
     if (!trimmed || !user) return;
@@ -88,10 +98,7 @@ export const Sidebar: React.FC = () => {
     return (
       <div key={folder.id}>
         <button
-          onClick={() => {
-            setCurrentFolder(folder.id);
-            navigate('/dashboard');
-          }}
+          onClick={() => handleNav('/dashboard', () => setCurrentFolder(folder.id))}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg',
             'hover:bg-slate-100',
@@ -128,9 +135,9 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
-      {/* Logo */}
-      <div className="p-4 border-b border-slate-200">
-        <div className="flex items-center gap-3">
+      {/* Logo + mobile close */}
+      <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
             <Shield className="w-5 h-5 text-white" />
           </div>
@@ -139,6 +146,16 @@ export const Sidebar: React.FC = () => {
             <h2 className="text-xs font-semibold text-indigo-600">PRESIDENT-REPARATIONS</h2>
           </div>
         </div>
+        {/* Close button — only visible on mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg shrink-0"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Main Navigation */}
@@ -146,10 +163,7 @@ export const Sidebar: React.FC = () => {
         {mainNav.map((item) => (
           <button
             key={item.path}
-            onClick={() => {
-              if (item.path === '/dashboard') setCurrentFolder(null);
-              navigate(item.path);
-            }}
+            onClick={() => handleNav(item.path, item.path === '/dashboard' ? () => setCurrentFolder(null) : undefined)}
             className={cn(
               'w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg',
               location.pathname === item.path
@@ -176,7 +190,6 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {/* Inline new folder input */}
         {isCreating && (
           <div className="mb-2 flex items-center gap-1 px-1">
             <Folder className="w-4 h-4 text-indigo-500 shrink-0" />
@@ -206,10 +219,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         <button
-          onClick={() => {
-            setCurrentFolder(null);
-            navigate('/dashboard');
-          }}
+          onClick={() => handleNav('/dashboard', () => setCurrentFolder(null))}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg mb-1',
             'hover:bg-slate-100',
@@ -230,7 +240,7 @@ export const Sidebar: React.FC = () => {
           .map((item) => (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg',
                 location.pathname === item.path
