@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User,
   Lock,
@@ -17,6 +17,33 @@ import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../store/authStore';
 import { useFileStore } from '../store/fileStore';
 import { cn } from '../utils/cn';
+import { supabase, supabaseConfigured } from '../lib/supabase';
+
+// ─── Theme helpers ────────────────────────────────────────────────────────────
+
+const THEME_KEY = 'app-theme';
+const COMPACT_KEY = 'app-compact';
+const EXTENSIONS_KEY = 'app-show-extensions';
+
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement;
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else if (theme === 'light') {
+    root.classList.remove('dark');
+  } else {
+    // system
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.toggle('dark', prefersDark);
+  }
+  localStorage.setItem(THEME_KEY, theme);
+}
+
+function getSavedTheme(): 'light' | 'dark' | 'system' {
+  return (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'system') || 'light';
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const Settings: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -26,12 +53,17 @@ export const Settings: React.FC = () => {
   const setViewMode = useFileStore((s) => s.setViewMode);
 
   const [activeTab, setActiveTab] = useState('profile');
-  
-  // Profile state
+
+  // ── Profile state ──────────────────────────────────────────────────────────
   const [name, setName] = useState(user?.name || '');
   const [profileSaved, setProfileSaved] = useState(false);
-  
-  // Security state
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Security state ─────────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,7 +72,7 @@ export const Settings: React.FC = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  // Notification settings
+  // ── Notification state ─────────────────────────────────────────────────────
   const [notifications, setNotifications] = useState({
     email: true,
     browser: true,
@@ -50,10 +82,10 @@ export const Settings: React.FC = () => {
   });
   const [notificationsSaved, setNotificationsSaved] = useState(false);
 
-  // Appearance settings
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-  const [compactMode, setCompactMode] = useState(false);
-  const [showFileExtensions, setShowFileExtensions] = useState(true);
+  // ── Appearance state ───────────────────────────────────────────────────────
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>(getSavedTheme);
+  const [compactMode, setCompactMode] = useState(() => localStorage.getItem(COMPACT_KEY) === 'true');
+  const [showFileExtensions, setShowFileExtensions] = useState(() => localStorage.getItem(EXTENSIONS_KEY) !== 'false');
   const [defaultView, setDefaultView] = useState<'grid' | 'list'>(viewMode);
   const [appearanceSaved, setAppearanceSaved] = useState(false);
 
@@ -62,6 +94,22 @@ export const Settings: React.FC = () => {
     setDefaultView(viewMode);
   }, [viewMode]);
 
+  // Apply saved theme on mount
+  useEffect(() => {
+    applyTheme(getSavedTheme());
+  }, []);
+
+  // Listen for OS theme changes when "system" is selected
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      document.documentElement.classList.toggle('dark', e.matches);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> },
     { id: 'security', label: 'Security', icon: <Lock className="w-4 h-4" /> },
@@ -69,7 +117,7 @@ export const Settings: React.FC = () => {
     { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
   ];
 
-  // Password validation
+  // ── Password validation ────────────────────────────────────────────────────
   const passwordRequirements = [
     { label: 'At least 8 characters', met: newPassword.length >= 8 },
     { label: 'Contains uppercase letter', met: /[A-Z]/.test(newPassword) },
@@ -80,13 +128,78 @@ export const Settings: React.FC = () => {
   const allRequirementsMet = passwordRequirements.every((r) => r.met);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
-  const handleSaveProfile = () => {
-    if (!name.trim()) return;
-    updateUser({ name: name.trim() });
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 3000);
+  // ── Avatar picker ──────────────────────────────────────────────────────────
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Please select an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Image must be smaller than 5 MB.');
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setProfileError('');
   };
 
+  // ── Save profile ───────────────────────────────────────────────────────────
+  const handleSaveProfile = async () => {
+    if (!name.trim()) return;
+    setProfileError('');
+    setProfileLoading(true);
+
+    try {
+      let avatarUrl = user?.avatar;
+
+      // Upload avatar if a new file was selected
+      if (avatarFile && user) {
+        if (supabaseConfigured) {
+          const ext = avatarFile.name.split('.').pop();
+          const storagePath = `avatars/${user.id}.${ext}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from('files')
+            .upload(storagePath, avatarFile, { upsert: true });
+
+          if (uploadErr) {
+            setProfileError('Failed to upload avatar: ' + uploadErr.message);
+            setProfileLoading(false);
+            return;
+          }
+
+          // Use a long-lived signed URL (10 years) since the bucket is private
+          const { data: signedData, error: signedErr } = await supabase.storage
+            .from('files')
+            .createSignedUrl(storagePath, 60 * 60 * 24 * 365 * 10);
+
+          if (signedErr || !signedData?.signedUrl) {
+            setProfileError('Failed to get avatar URL: ' + (signedErr?.message ?? 'unknown error'));
+            setProfileLoading(false);
+            return;
+          }
+
+          avatarUrl = signedData.signedUrl;
+        } else {
+          // No Supabase — keep the object URL as a local preview
+          avatarUrl = avatarPreview ?? undefined;
+        }
+      }
+
+      await updateUser({ name: name.trim(), avatar: avatarUrl });
+      setAvatarFile(null);
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 3000);
+    } catch (e: any) {
+      setProfileError(e.message || 'Failed to save profile.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // ── Save password ──────────────────────────────────────────────────────────
   const handleSavePassword = async () => {
     setPasswordError('');
     setPasswordSuccess(false);
@@ -105,7 +218,6 @@ export const Settings: React.FC = () => {
     }
 
     setPasswordLoading(true);
-    // Fix #9: actually call Supabase to change the password
     const result = await changePassword(currentPassword, newPassword);
     setPasswordLoading(false);
 
@@ -120,19 +232,23 @@ export const Settings: React.FC = () => {
     }
   };
 
+  // ── Save notifications ─────────────────────────────────────────────────────
   const handleSaveNotifications = () => {
-    // In real app, would save to backend
     setNotificationsSaved(true);
     setTimeout(() => setNotificationsSaved(false), 3000);
   };
 
+  // ── Save appearance ────────────────────────────────────────────────────────
   const handleSaveAppearance = () => {
+    applyTheme(theme);
     setViewMode(defaultView);
-    // In real app, would save theme and other preferences
+    localStorage.setItem(COMPACT_KEY, String(compactMode));
+    localStorage.setItem(EXTENSIONS_KEY, String(showFileExtensions));
     setAppearanceSaved(true);
     setTimeout(() => setAppearanceSaved(false), 3000);
   };
 
+  // ── Toggle switch ──────────────────────────────────────────────────────────
   const ToggleSwitch = ({ enabled, onChange }: { enabled: boolean; onChange: () => void }) => (
     <button
       onClick={onChange}
@@ -150,6 +266,7 @@ export const Settings: React.FC = () => {
     </button>
   );
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -182,7 +299,8 @@ export const Settings: React.FC = () => {
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Profile Tab */}
+
+          {/* ── Profile Tab ── */}
           {activeTab === 'profile' && (
             <Card>
               <CardHeader>
@@ -190,13 +308,40 @@ export const Settings: React.FC = () => {
                 <p className="text-sm text-slate-500">Update your profile details and avatar</p>
               </CardHeader>
               <CardContent className="space-y-6">
+                {profileError && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{profileError}</p>
+                  </div>
+                )}
+
                 {/* Avatar */}
                 <div className="flex items-center gap-6">
                   <div className="relative">
-                    <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                      {user?.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <button className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                    {avatarPreview ? (
+                      <img
+                        src={avatarPreview}
+                        alt="Profile"
+                        className="w-24 h-24 rounded-full object-cover border-2 border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                      title="Change profile picture"
+                    >
                       <Camera className="w-4 h-4 text-slate-600" />
                     </button>
                   </div>
@@ -204,6 +349,9 @@ export const Settings: React.FC = () => {
                     <h3 className="font-medium text-slate-900">{user?.name}</h3>
                     <p className="text-sm text-slate-500 capitalize">{user?.role}</p>
                     <p className="text-xs text-slate-400 mt-1">{user?.email}</p>
+                    {avatarFile && (
+                      <p className="text-xs text-indigo-600 mt-1">New photo selected — save to apply</p>
+                    )}
                   </div>
                 </div>
 
@@ -238,7 +386,11 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Button onClick={handleSaveProfile} disabled={!name.trim()}>
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={!name.trim() || profileLoading}
+                    isLoading={profileLoading}
+                  >
                     Save Changes
                   </Button>
                   {profileSaved && (
@@ -252,7 +404,7 @@ export const Settings: React.FC = () => {
             </Card>
           )}
 
-          {/* Security Tab */}
+          {/* ── Security Tab ── */}
           {activeTab === 'security' && (
             <Card>
               <CardHeader>
@@ -279,7 +431,10 @@ export const Settings: React.FC = () => {
                     label="Current Password"
                     type={showPasswords ? 'text' : 'password'}
                     value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPasswordError('');
+                    }}
                     leftIcon={<Lock className="w-4 h-4" />}
                     rightIcon={
                       <button
@@ -295,14 +450,19 @@ export const Settings: React.FC = () => {
                     label="New Password"
                     type={showPasswords ? 'text' : 'password'}
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordError('');
+                    }}
                     leftIcon={<Lock className="w-4 h-4" />}
                   />
 
                   {/* Password Requirements */}
                   {newPassword.length > 0 && (
                     <div className="p-4 bg-slate-50 rounded-lg space-y-2">
-                      <p className="text-xs font-medium text-slate-600 uppercase tracking-wider">Password Requirements</p>
+                      <p className="text-xs font-medium text-slate-600 uppercase tracking-wider">
+                        Password Requirements
+                      </p>
                       {passwordRequirements.map((req, i) => (
                         <div key={i} className="flex items-center gap-2">
                           {req.met ? (
@@ -322,7 +482,10 @@ export const Settings: React.FC = () => {
                     label="Confirm New Password"
                     type={showPasswords ? 'text' : 'password'}
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordError('');
+                    }}
                     leftIcon={<Lock className="w-4 h-4" />}
                     error={confirmPassword && !passwordsMatch ? 'Passwords do not match' : undefined}
                   />
@@ -330,7 +493,7 @@ export const Settings: React.FC = () => {
 
                 <Button
                   onClick={handleSavePassword}
-                  disabled={!currentPassword || !newPassword || !confirmPassword}
+                  disabled={!currentPassword || !newPassword || !confirmPassword || passwordLoading}
                   isLoading={passwordLoading}
                 >
                   Update Password
@@ -355,7 +518,7 @@ export const Settings: React.FC = () => {
             </Card>
           )}
 
-          {/* Notifications Tab */}
+          {/* ── Notifications Tab ── */}
           {activeTab === 'notifications' && (
             <Card>
               <CardHeader>
@@ -405,7 +568,7 @@ export const Settings: React.FC = () => {
             </Card>
           )}
 
-          {/* Appearance Tab */}
+          {/* ── Appearance Tab ── */}
           {activeTab === 'appearance' && (
             <Card>
               <CardHeader>
@@ -420,7 +583,11 @@ export const Settings: React.FC = () => {
                     {(['light', 'dark', 'system'] as const).map((t) => (
                       <button
                         key={t}
-                        onClick={() => setTheme(t)}
+                        onClick={() => {
+                          setThemeState(t);
+                          // Preview immediately
+                          applyTheme(t);
+                        }}
                         className={cn(
                           'p-4 rounded-lg border-2 text-center transition-all',
                           theme === t
@@ -440,11 +607,6 @@ export const Settings: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                  {theme === 'dark' && (
-                    <p className="text-xs text-amber-600 mt-2">
-                      Note: Dark mode is a preview feature and not fully implemented yet.
-                    </p>
-                  )}
                 </div>
 
                 {/* Default View */}

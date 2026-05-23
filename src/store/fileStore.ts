@@ -156,8 +156,14 @@ export const useFileStore = create<FileState>()((set, get) => ({
     if (!supabaseConfigured || get().dataLoaded) return;
 
     try {
+      // Fetch files without versions (versions are loaded on-demand in FileDetail)
+      // Limit initial file fetch to 200 most recent to keep the payload small
       const [filesRes, foldersRes, activitiesRes, sharesRes, tagsRes] = await Promise.all([
-        supabase.from('files').select('*, profiles(name), file_versions(*)').order('created_at', { ascending: false }),
+        supabase
+          .from('files')
+          .select('*, profiles(name)')
+          .order('created_at', { ascending: false })
+          .limit(200),
         supabase.from('folders').select('*').order('name'),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('share_links').select('*'),
@@ -165,7 +171,7 @@ export const useFileStore = create<FileState>()((set, get) => ({
       ]);
 
       set({
-        files: (filesRes.data || []).map(mapFile),
+        files: (filesRes.data || []).map((f) => mapFile({ ...f, file_versions: [] })),
         folders: (foldersRes.data || []).map(mapFolder),
         activities: (activitiesRes.data || []).map(mapActivity),
         shares: (sharesRes.data || []).map(mapShare),

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Grid,
@@ -78,38 +78,51 @@ export const Dashboard: React.FC = () => {
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
-  // Derive data directly — no stale closures
-  const activeFiles = allFiles.filter((f) => !f.deletedAt);
-  const files = activeFiles
-    .filter((f) => f.folderId === currentFolderId)
-    .sort((a, b) => {
-      let c = 0;
-      switch (sortBy) {
-        case 'name': c = a.name.localeCompare(b.name); break;
-        case 'date': c = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
-        case 'size': c = b.size - a.size; break;
-        case 'type': c = a.mimeType.localeCompare(b.mimeType); break;
+  // Derive data — memoized so these only recompute when their inputs change
+  const activeFiles = useMemo(() => allFiles.filter((f) => !f.deletedAt), [allFiles]);
+
+  const files = useMemo(() => {
+    return activeFiles
+      .filter((f) => f.folderId === currentFolderId)
+      .sort((a, b) => {
+        let c = 0;
+        switch (sortBy) {
+          case 'name': c = a.name.localeCompare(b.name); break;
+          case 'date': c = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
+          case 'size': c = b.size - a.size; break;
+          case 'type': c = a.mimeType.localeCompare(b.mimeType); break;
+        }
+        return sortOrder === 'asc' ? c : -c;
+      });
+  }, [activeFiles, currentFolderId, sortBy, sortOrder]);
+
+  const subfolders = useMemo(
+    () => folders.filter((f) => f.parentId === currentFolderId),
+    [folders, currentFolderId]
+  );
+
+  const folderPath: Folder[] = useMemo(() => {
+    const path: Folder[] = [];
+    if (currentFolderId) {
+      let cur = folders.find((f) => f.id === currentFolderId);
+      while (cur) {
+        path.unshift(cur);
+        cur = cur.parentId ? folders.find((f) => f.id === cur!.parentId) : undefined;
       }
-      return sortOrder === 'asc' ? c : -c;
-    });
-
-  const subfolders = folders.filter((f) => f.parentId === currentFolderId);
-
-  const folderPath: Folder[] = [];
-  if (currentFolderId) {
-    let cur = folders.find((f) => f.id === currentFolderId);
-    while (cur) {
-      folderPath.unshift(cur);
-      cur = cur.parentId ? folders.find((f) => f.id === cur!.parentId) : undefined;
     }
-  }
+    return path;
+  }, [folders, currentFolderId]);
 
-  const recentFiles = [...activeFiles]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5);
+  const recentFiles = useMemo(
+    () =>
+      [...activeFiles]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 5),
+    [activeFiles]
+  );
 
-  const starredCount = activeFiles.filter((f) => f.starred).length;
-  const totalStorage = activeFiles.reduce((acc, f) => acc + f.size, 0);
+  const starredCount = useMemo(() => activeFiles.filter((f) => f.starred).length, [activeFiles]);
+  const totalStorage = useMemo(() => activeFiles.reduce((acc, f) => acc + f.size, 0), [activeFiles]);
   const totalFileCount = activeFiles.length;
 
   const doCreateFolder = async () => {

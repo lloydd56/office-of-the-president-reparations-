@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Shield,
@@ -9,6 +9,7 @@ import {
   HardDrive,
   FileText,
   TrendingUp,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../components/ui/Button';
@@ -17,12 +18,28 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { useAuthStore } from '../store/authStore';
 import { useFileStore } from '../store/fileStore';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 import { cn } from '../utils/cn';
 import { User, UserRole } from '../types';
 
+// ─── Types for the get_system_stats RPC ──────────────────────────────────────
+interface SystemStats {
+  total_users: number;
+  pending_users: number;
+  active_users?: number;
+  total_files: number;
+  trashed_files: number;
+  total_folders: number;
+  total_storage: number;
+  active_shares: number;
+  today_uploads: number;
+  users_by_role: Record<string, number>;
+  storage_by_user: { user_id: string; name: string; bytes_used: number; file_count: number }[];
+}
+
 export const Admin: React.FC = () => {
   const { user: currentUser, getAllUsers, getPendingUsers, approveUser, rejectUser, updateUserRole } = useAuthStore();
-  const { files, folders, getRecentActivity } = useFileStore();
+  const { getRecentActivity } = useFileStore();
   
   const allUsers = getAllUsers();
   const pendingUsers = getPendingUsers();
@@ -32,15 +49,33 @@ export const Admin: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [newRole, setNewRole] = useState<UserRole>('staff');
-  
-  // Stats
-  const stats = {
+
+  // ── Server-side stats via get_system_stats() RPC ──────────────────────────
+  const [dbStats, setDbStats] = useState<SystemStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = async () => {
+    if (!supabaseConfigured) return;
+    setStatsLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_system_stats');
+      if (!error && data) setDbStats(data as SystemStats);
+    } catch { /* ignore */ }
+    setStatsLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'stats') fetchStats();
+  }, [activeTab]);
+
+  // Fallback stats from local store (used for quick cards at top)
+  const localStats = {
     totalUsers: allUsers.length,
     pendingUsers: pendingUsers.length,
     activeUsers: allUsers.filter(u => u.approved).length,
-    totalFiles: files.length,
-    totalFolders: folders.length,
-    totalStorage: files.reduce((acc, f) => acc + f.size, 0),
+    totalFiles: dbStats?.total_files ?? 0,
+    totalFolders: dbStats?.total_folders ?? 0,
+    totalStorage: dbStats?.total_storage ?? 0,
   };
   
   const formatStorage = (bytes: number) => {
@@ -134,7 +169,7 @@ export const Admin: React.FC = () => {
               <Users className="w-6 h-6 text-indigo-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.totalUsers}</p>
+              <p className="text-2xl font-bold text-slate-900">{localStats.totalUsers}</p>
               <p className="text-sm text-slate-500">Total Users</p>
             </div>
           </CardContent>
@@ -145,7 +180,7 @@ export const Admin: React.FC = () => {
               <Clock className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.pendingUsers}</p>
+              <p className="text-2xl font-bold text-slate-900">{localStats.pendingUsers}</p>
               <p className="text-sm text-slate-500">Pending</p>
             </div>
           </CardContent>
@@ -156,7 +191,7 @@ export const Admin: React.FC = () => {
               <FileText className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.totalFiles}</p>
+              <p className="text-2xl font-bold text-slate-900">{localStats.totalFiles}</p>
               <p className="text-sm text-slate-500">Files</p>
             </div>
           </CardContent>
@@ -167,7 +202,7 @@ export const Admin: React.FC = () => {
               <HardDrive className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{formatStorage(stats.totalStorage)}</p>
+              <p className="text-2xl font-bold text-slate-900">{formatStorage(localStats.totalStorage)}</p>
               <p className="text-sm text-slate-500">Storage</p>
             </div>
           </CardContent>
@@ -344,77 +379,129 @@ export const Admin: React.FC = () => {
       
       {/* Statistics */}
       {activeTab === 'stats' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-slate-400" />
-                <h3 className="font-semibold text-slate-900">System Overview</h3>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span className="text-slate-500">Total Users</span>
-                  <span className="font-semibold text-slate-900">{stats.totalUsers}</span>
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchStats}
+              isLoading={statsLoading}
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+            >
+              Refresh
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-semibold text-slate-900">System Overview</h3>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span className="text-slate-500">Active Users</span>
-                  <span className="font-semibold text-slate-900">{stats.activeUsers}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span className="text-slate-500">Total Files</span>
-                  <span className="font-semibold text-slate-900">{stats.totalFiles}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span className="text-slate-500">Total Folders</span>
-                  <span className="font-semibold text-slate-900">{stats.totalFolders}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-slate-500">Storage Used</span>
-                  <span className="font-semibold text-slate-900">{formatStorage(stats.totalStorage)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-slate-400" />
-                <h3 className="font-semibold text-slate-900">User Roles Distribution</h3>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {(['admin', 'manager', 'staff', 'guest'] as UserRole[]).map(role => {
-                  const count = allUsers.filter(u => u.role === role).length;
-                  const percentage = stats.totalUsers > 0 ? (count / stats.totalUsers) * 100 : 0;
-                  
-                  return (
-                    <div key={role}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-600 capitalize">{role}</span>
-                        <span className="text-slate-900 font-medium">{count}</span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            'h-full rounded-full',
-                            role === 'admin' && 'bg-red-500',
-                            role === 'manager' && 'bg-amber-500',
-                            role === 'staff' && 'bg-blue-500',
-                            role === 'guest' && 'bg-slate-400'
-                          )}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    ['Total Users',    dbStats?.total_users   ?? localStats.totalUsers],
+                    ['Active Users',   dbStats ? (dbStats.total_users - dbStats.pending_users) : localStats.activeUsers],
+                    ['Pending Users',  dbStats?.pending_users ?? localStats.pendingUsers],
+                    ['Total Files',    dbStats?.total_files   ?? '—'],
+                    ['Trashed Files',  dbStats?.trashed_files ?? '—'],
+                    ['Total Folders',  dbStats?.total_folders ?? '—'],
+                    ['Active Shares',  dbStats?.active_shares ?? '—'],
+                    ["Today's Uploads",dbStats?.today_uploads ?? '—'],
+                    ['Storage Used',   formatStorage(dbStats?.total_storage ?? 0)],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                      <span className="text-slate-500">{label}</span>
+                      <span className="font-semibold text-slate-900">{value}</span>
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-semibold text-slate-900">User Roles Distribution</h3>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {(['admin', 'manager', 'staff', 'guest'] as UserRole[]).map(role => {
+                    const count = dbStats?.users_by_role?.[role] ?? allUsers.filter(u => u.role === role).length;
+                    const total = dbStats?.total_users ?? localStats.totalUsers;
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    return (
+                      <div key={role}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-600 capitalize">{role}</span>
+                          <span className="text-slate-900 font-medium">{count}</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              'h-full rounded-full',
+                              role === 'admin'   && 'bg-red-500',
+                              role === 'manager' && 'bg-amber-500',
+                              role === 'staff'   && 'bg-blue-500',
+                              role === 'guest'   && 'bg-slate-400'
+                            )}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Storage by user — only available from DB stats */}
+            {dbStats?.storage_by_user && dbStats.storage_by_user.length > 0 && (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-5 h-5 text-slate-400" />
+                    <h3 className="font-semibold text-slate-900">Top Storage Users</h3>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Files</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Used</th>
+                        <th className="px-6 py-3 w-48"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {dbStats.storage_by_user.map((row) => {
+                        const maxBytes = dbStats.storage_by_user[0]?.bytes_used || 1;
+                        const pct = (row.bytes_used / maxBytes) * 100;
+                        return (
+                          <tr key={row.user_id} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-medium text-slate-900">{row.name}</td>
+                            <td className="px-6 py-3 text-slate-500">{row.file_count}</td>
+                            <td className="px-6 py-3 text-slate-500">{formatStorage(row.bytes_used)}</td>
+                            <td className="px-6 py-3">
+                              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
       

@@ -70,11 +70,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     set({ initialized: true });
 
+    // Track whether we already loaded the session above so the
+    // SIGNED_IN event (which fires immediately on subscribe) doesn't
+    // trigger a redundant profile fetch.
+    let initialSessionHandled = true;
+
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        initialSessionHandled = false;
         set({ user: null, isAuthenticated: false });
       } else if (event === 'SIGNED_IN' && session?.user) {
+        // Skip the first SIGNED_IN if we already loaded the session above
+        if (initialSessionHandled) {
+          initialSessionHandled = false;
+          return;
+        }
+
         // Small delay for trigger to create profile
         await new Promise((r) => setTimeout(r, 300));
 
@@ -249,7 +261,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     });
   },
 
-  // Fix #9: actually calls Supabase to change the password
   changePassword: async (currentPassword: string, newPassword: string) => {
     if (!supabaseConfigured) {
       return { success: false, error: 'Supabase is not configured.' };
@@ -259,7 +270,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!user) return { success: false, error: 'Not authenticated.' };
 
     try {
-      // Re-authenticate to verify current password
+      // Verify current password by attempting a sign-in (does not affect current session)
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
@@ -269,7 +280,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return { success: false, error: 'Current password is incorrect.' };
       }
 
-      // Update to new password
+      // Update to new password — this keeps the session alive
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -277,6 +288,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       if (updateError) {
         return { success: false, error: updateError.message };
       }
+
+      // Log the password change activity
+      supabase.from('activity_log').insert({
+        user_id: user.id,
+        user_name: user.name,
+        action: 'password_change',
+        resource_type: 'user',
+        resource_id: user.id,
+        resource_name: user.name,
+      }).then();
 
       return { success: true };
     } catch (e: any) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search as SearchIcon,
@@ -45,12 +45,21 @@ export const Search: React.FC = () => {
   const { searchFiles, tags, starFile, unstarFile } = useFileStore();
   
   const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedType, setSelectedType] = useState('all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [starredOnly, setStarredOnly] = useState(false);
+
+  // Debounce the query so search only runs 300ms after the user stops typing
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
   
   const results = useMemo(() => {
     const filters: any = {};
@@ -71,14 +80,14 @@ export const Search: React.FC = () => {
       filters.dateTo = new Date(dateTo);
     }
     
-    let files = searchFiles(query, filters);
+    let files = searchFiles(debouncedQuery, filters);
     
     if (starredOnly) {
       files = files.filter(f => f.starred);
     }
     
     return files;
-  }, [query, selectedType, selectedTags, dateFrom, dateTo, starredOnly, searchFiles]);
+  }, [debouncedQuery, selectedType, selectedTags, dateFrom, dateTo, starredOnly, searchFiles]);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
